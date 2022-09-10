@@ -1,0 +1,27 @@
+{
+  "name": "comic-spider",
+  "version": "1.0.0",
+  "description": "",
+  "main": "get.js",
+  "scripts": {
+    "dev": "webpack",
+    "getLinks": "node dist/puppeteer_spider.js",
+    "download": "node dist/download_spider.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/puppeteer": "^2.0.1",
+    "bufferutil": "^4.0.1",
+    "puppeteer": "^2.1.1",
+    "utf-8-validate": "^5.0.2"
+  },
+  "devDependencies": {
+    "source-map-loader": "^0.2.4",
+    "ts-loader": "^6.2.2",
+    "typescript": "^3.8.3",
+    "webpack": "^4.42.1",
+    "webpack-cli": "^3.3.11"
+  }
+}
