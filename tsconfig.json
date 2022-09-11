@@ -1,18 +1,50 @@
 {
   "compilerOptions": {
-      "module": "CommonJS",
-      "target": "ES6",
-      "noImplicitAny": true,
-      "removeComments": true,
-      "preserveConstEnums": true,
-      "sourceMap": true,
-      "resolveJsonModule": true
+    "module": "CommonJS",
+    "esModuleInterop": true,
+    "jsx": "react",
+    "target": "ESNext",
+    "allowUmdGlobalAccess": true,
+    "outDir": "out",
+    "noImplicitAny": true,
+    "removeComments": true,
+    "preserveConstEnums": true,
+    "sourceMap": true,
+    "strict": true,
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "checkJs": true,
+    // https://www.typescriptlang.org/docs/handbook/babel-with-typescript.html#type-checking-and-dts-file-generation
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "isolatedModules": true,
+    "plugins": [
+      {
+        "name": "typescript-plugin-css-modules"
+      }
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "~/*": [
+        "src/app/*"
+      ],
+      "src/*": [
+        "src/*"
+      ],
+      "workspace/*": [
+        "./*"
+      ]
+    }
   },
   "include": [
-      "./**/*"
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "test/**/*.ts",
+    "nodes/**/*.ts",
+    "webpack/**/*.js"
   ],
   "exclude": [
-      "node_modules",
-      "**/*.spec.ts"
+    "node_modules",
+    ".vscode"
   ]
 }
