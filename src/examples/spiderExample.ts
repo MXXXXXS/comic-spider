@@ -11,6 +11,24 @@ export class SpiderExample extends Spider implements Spider {
     super(args)
   }
 
+  async getChapterEntries(indexPage: Page): Promise<string[]> {
+    return indexPage.$eval("", (el) => {
+      const ddEls = el.querySelectorAll("dd")
+      return Array.from(ddEls).map((ddEl) => {
+        const aEl = ddEl.querySelector("a") as HTMLAnchorElement
+        return aEl.href
+      })
+    })
+  }
+
+  async getChapterPageCounts(page: Page): Promise<number> {
+    return page.$eval("", (el) => {
+      const { innerText } = el as HTMLElement
+      const [_, pages] = innerText.match(/共(\d+)页/) || [undefined, "0"]
+      return parseInt(pages)
+    })
+  }
+
   async getNextPageUrl(page: Page): Promise<string> {
     const nextPageUrl = await page.$eval(
       this.nextPageAnchorSelector,
@@ -35,13 +53,12 @@ export class SpiderExample extends Spider implements Spider {
 }
 
 const spider = new SpiderExample({
-  url: "",
+  indexUrl: "",
   proxy: "",
   headless: false,
+  chapterRange: [0, 1],
 })
 
-const pageCounts = 15
-
-spider.run(pageCounts).catch((err) => {
+spider.run().catch((err) => {
   console.error(err)
 })

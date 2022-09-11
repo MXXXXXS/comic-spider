@@ -15,16 +15,18 @@ enum ImageDownloadStates {
 }
 
 export interface SpiderArgs {
-  url: string
+  indexUrl: string
   headers?: [string, string][]
   proxy?: string
   throttle?: number
   throttleRandom?: number
   headless?: boolean
+  pageParallelCounts?: number
+  chapterRange?: [number, number]
 }
 
 export abstract class Spider extends Events {
-  url = ""
+  indexUrl = ""
   headers: [string, string][] = [
     ["DNT", "1"],
     [
@@ -36,6 +38,9 @@ export abstract class Spider extends Events {
   throttle = 0
   throttleRandom = 0
   headless = true
+  pageParallelCounts = 3
+  chapterRange = [0, 1]
+  private browser?: puppeteer.Browser
   private imageUrlDic: Record<
     string,
     {
@@ -45,21 +50,29 @@ export abstract class Spider extends Events {
   > = {}
 
   constructor({
-    url,
+    indexUrl,
     headers = [],
     proxy = "",
     throttle = 1000,
     throttleRandom = 0,
     headless = true,
+    pageParallelCounts = 3,
+    chapterRange,
   }: SpiderArgs) {
     super()
-    this.url = url
+    this.indexUrl = indexUrl
     this.proxy = proxy
     this.throttle = throttle
     this.throttleRandom = throttleRandom
     this.headless = headless
-    this.headers.push(["Referer", new URL(url).href], ...headers)
+    this.pageParallelCounts = pageParallelCounts
+    this.chapterRange = chapterRange || this.chapterRange
+    this.headers.push(["Referer", new URL(indexUrl).href], ...headers)
   }
+
+  abstract getChapterEntries(indexPage: puppeteer.Page): Promise<string[]>
+
+  abstract getChapterPageCounts(page: puppeteer.Page): Promise<number>
 
   abstract getImageUrls(page: puppeteer.Page): Promise<string[]>
 
@@ -76,8 +89,7 @@ export abstract class Spider extends Events {
       },
       args: [`--proxy-server=${this.proxy}`],
     })
-    const page = await browser.newPage()
-    return page
+    return browser
   }
 
   private async saveImageUrls(page: puppeteer.Page) {
@@ -115,20 +127,44 @@ export abstract class Spider extends Events {
     }
   }
 
-  async run(pageCounts: number) {
-    let nextPageUrl = this.url
+  private async fetchChapter(nextPageUrl: string) {
+    if (!this.browser) throw "No browser"
+    const page = await this.browser.newPage()
+    await page.goto(nextPageUrl)
+    let pageCounts = await this.getChapterPageCounts(page)
+    while (pageCounts--) {
+      const imgUrls = await this.saveImageUrls(page)
+      this.emit("imgUrls", imgUrls)
+      nextPageUrl = await this.getNextPageUrl(page)
+      await page.goto(nextPageUrl)
+      await wait(this.throttle + this.throttleRandom * Math.random())
+    }
+  }
+
+  async run() {
+    this.browser = await this.openBrowser()
+    const indexPage = await this.browser.newPage()
+    await indexPage.goto(this.indexUrl)
+    const chapterEntries = (await this.getChapterEntries(indexPage)).slice(
+      ...this.chapterRange
+    )
     this.on("imgUrls", (imgUrls: string[]) => {
       imgUrls.forEach((imgUrl) => {
         this.downloadImg(imgUrl)
       })
     })
-    const page = await this.openBrowser()
-    while (pageCounts--) {
-      await page.goto(nextPageUrl)
-      const imgUrls = await this.saveImageUrls(page)
-      this.emit("imgUrls", imgUrls)
-      nextPageUrl = await this.getNextPageUrl(page)
-      await wait(this.throttle + this.throttleRandom * Math.random())
+    for (
+      let index = 0;
+      index < chapterEntries.length;
+      index += this.pageParallelCounts
+    ) {
+      const entries = chapterEntries.slice(
+        index,
+        index + this.pageParallelCounts
+      )
+      await Promise.all(
+        entries.map((chapterEntry) => this.fetchChapter(chapterEntry))
+      )
     }
     process.exit(0)
   }
