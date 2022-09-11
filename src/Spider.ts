@@ -19,6 +19,7 @@ export interface SpiderArgs {
   headers?: [string, string][]
   proxy?: string
   throttle?: number
+  throttleRandom?: number
   headless?: boolean
 }
 
@@ -33,6 +34,7 @@ export abstract class Spider extends Events {
   ]
   proxy = ""
   throttle = 0
+  throttleRandom = 0
   headless = true
   private imageUrlDic: Record<
     string,
@@ -47,12 +49,14 @@ export abstract class Spider extends Events {
     headers = [],
     proxy = "",
     throttle = 1000,
+    throttleRandom = 0,
     headless = true,
   }: SpiderArgs) {
     super()
     this.url = url
     this.proxy = proxy
     this.throttle = throttle
+    this.throttleRandom = throttleRandom
     this.headless = headless
     this.headers.push(["Referer", new URL(url).href], ...headers)
   }
@@ -124,7 +128,7 @@ export abstract class Spider extends Events {
       const imgUrls = await this.saveImageUrls(page)
       this.emit("imgUrls", imgUrls)
       nextPageUrl = await this.getNextPageUrl(page)
-      await wait(this.throttle)
+      await wait(this.throttle + this.throttleRandom * Math.random())
     }
     process.exit(0)
   }
