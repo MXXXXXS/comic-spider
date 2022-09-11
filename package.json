@@ -12,6 +12,7 @@
   "dependencies": {
     "events": "^3.3.0",
     "fs-extra": "^10.1.0",
+    "http-proxy-agent": "^5.0.0",
     "puppeteer": "^17.1.3"
   },
   "devDependencies": {

@@ -1,15 +1,25 @@
 import * as puppeteer from "puppeteer"
 import * as path from "path"
+import * as HttpProxyAgent from "http-proxy-agent"
 import Events from "events"
 import fetch, { Headers } from "node-fetch"
 import { createWriteStream } from "fs"
 import { ensureDirSync } from "fs-extra"
+import { wait } from "./utils"
 
 enum ImageDownloadStates {
   waiting,
   downloading,
   ok,
   error,
+}
+
+export interface SpiderArgs {
+  url: string
+  headers?: [string, string][]
+  proxy?: string
+  throttle?: number
+  headless?: boolean
 }
 
 export abstract class Spider extends Events {
@@ -22,6 +32,8 @@ export abstract class Spider extends Events {
     ],
   ]
   proxy = ""
+  throttle = 0
+  headless = true
   private imageUrlDic: Record<
     string,
     {
@@ -34,14 +46,14 @@ export abstract class Spider extends Events {
     url,
     headers = [],
     proxy = "",
-  }: {
-    url: string
-    headers?: [string, string][]
-    proxy?: ""
-  }) {
+    throttle = 1000,
+    headless = true,
+  }: SpiderArgs) {
     super()
     this.url = url
     this.proxy = proxy
+    this.throttle = throttle
+    this.headless = headless
     this.headers.push(["Referer", new URL(url).href], ...headers)
   }
 
@@ -53,15 +65,12 @@ export abstract class Spider extends Events {
 
   private async openBrowser() {
     const browser = await puppeteer.launch({
-      headless: true,
+      headless: this.headless,
       defaultViewport: {
         width: 1280,
         height: 800,
       },
-      env: {
-        HTTP_PROXY: this.proxy,
-        HTTPS_PROXY: this.proxy,
-      },
+      args: [`--proxy-server=${this.proxy}`],
     })
     const page = await browser.newPage()
     return page
@@ -83,6 +92,7 @@ export abstract class Spider extends Events {
       this.imageUrlDic[imgUrl].state = ImageDownloadStates.downloading
       const res = await fetch(imgUrl, {
         headers: new Headers(this.headers),
+        agent: new HttpProxyAgent(this.proxy),
       })
       const imageSavePath = this.getImageSavePath(imgUrl)
       ensureDirSync(path.dirname(imageSavePath))
@@ -114,6 +124,8 @@ export abstract class Spider extends Events {
       const imgUrls = await this.saveImageUrls(page)
       this.emit("imgUrls", imgUrls)
       nextPageUrl = await this.getNextPageUrl(page)
+      await wait(this.throttle)
     }
+    process.exit(0)
   }
 }

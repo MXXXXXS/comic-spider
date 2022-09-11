@@ -1,11 +1,13 @@
+import { join } from "path"
 import { Page } from "puppeteer"
-import { Spider } from "src/Spider"
+import { Spider, SpiderArgs } from "src/Spider"
 
 export class SpiderExample extends Spider implements Spider {
   imageSelector = ""
   nextPageAnchorSelector = ""
+  imageSaveDir = "src/app/imageSaveDir"
 
-  constructor(args: { url: string }) {
+  constructor(args: SpiderArgs) {
     super(args)
   }
 
@@ -26,15 +28,19 @@ export class SpiderExample extends Spider implements Spider {
   }
 
   getImageSavePath(imgUrl: string): string {
-    return ""
+    const pathParts = imgUrl.split("/")
+    const [dir, imgName] = pathParts.slice(-2).map((p) => decodeURI(p))
+    return join(this.imageSaveDir, dir, imgName)
   }
 }
 
 const spider = new SpiderExample({
   url: "",
+  proxy: "",
+  headless: false,
 })
 
-const pageCounts = 2
+const pageCounts = 15
 
 spider.run(pageCounts).catch((err) => {
   console.error(err)
