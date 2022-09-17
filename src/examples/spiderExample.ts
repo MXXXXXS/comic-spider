@@ -1,6 +1,6 @@
-import { join } from "path"
+import { join, extname } from "path"
 import { Page } from "puppeteer"
-import { Spider, SpiderArgs } from "src/Spider"
+import { Spider, ImageInfo, SpiderArgs } from "src/Spider"
 
 export class SpiderExample extends Spider implements Spider {
   imageSelector = ""
@@ -45,10 +45,10 @@ export class SpiderExample extends Spider implements Spider {
     return [imgUrl]
   }
 
-  getImageSavePath(imgUrl: string): string {
-    const pathParts = imgUrl.split("/")
-    const [dir, imgName] = pathParts.slice(-2).map((p) => decodeURI(p))
-    return join(this.imageSaveDir, dir, imgName)
+  getImageSavePath(imageInfo: ImageInfo): string {
+    const pathParts = imageInfo.url.split("/")
+    const [dir, imageName] = pathParts.slice(-2).map((p) => decodeURI(p))
+    return join(this.imageSaveDir, dir, imageInfo.pageIndex.toString() + extname(imageName))
   }
 }
 
