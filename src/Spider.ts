@@ -76,9 +76,9 @@ export abstract class Spider extends Events {
 
   abstract getImageUrls(page: puppeteer.Page): Promise<string[]>
 
-  abstract getNextPageUrl(page: puppeteer.Page): Promise<string>
+  abstract getNextPageUrl(page: puppeteer.Page): Promise<string | undefined>
 
-  abstract getImageSavePath(imageInfo: ImageInfo ): string
+  abstract getImageSavePath(imageInfo: ImageInfo): string
 
   private async openBrowser() {
     const browser = await puppeteer.launch({
@@ -106,7 +106,9 @@ export abstract class Spider extends Events {
   }
 
   private async downloadImg(imageInfo: ImageInfo) {
-    if (this.imageInfoMap[imageInfo.url].state === ImageDownloadStates.waiting) {
+    if (
+      this.imageInfoMap[imageInfo.url].state === ImageDownloadStates.waiting
+    ) {
       this.imageInfoMap[imageInfo.url].state = ImageDownloadStates.downloading
       const res = await fetch(imageInfo.url, {
         headers: new Headers(this.headers),
@@ -129,17 +131,19 @@ export abstract class Spider extends Events {
     }
   }
 
-  private async fetchChapter(nextPageUrl: string) {
+  private async fetchChapter(chapterEntry: string) {
     if (!this.browser) throw "No browser"
     const page = await this.browser.newPage()
-    await page.goto(nextPageUrl)
+    await page.goto(chapterEntry)
     const pageCounts = await this.getChapterPageCounts(page)
     let currentPageIndex = 0
     while (currentPageIndex < pageCounts) {
       const imageInfoList = await this.saveImageUrls(page, currentPageIndex + 1)
       this.emit("imageInfoList", imageInfoList)
-      nextPageUrl = await this.getNextPageUrl(page)
-      await page.goto(nextPageUrl)
+      const nextPageUrl = await this.getNextPageUrl(page)
+      if (nextPageUrl) {
+        await page.goto(nextPageUrl)
+      }
       await wait(this.throttle + this.throttleRandom * Math.random())
       currentPageIndex++
     }
@@ -152,7 +156,7 @@ export abstract class Spider extends Events {
     const chapterEntries = (await this.getChapterEntries(indexPage)).slice(
       ...this.chapterRange
     )
-    this.on("imageInfoList", (imageInfoList: string[]) => {
+    this.on("imageInfoList", (imageInfoList: ImageInfo[]) => {
       imageInfoList.forEach((imageInfo) => {
         this.downloadImg(imageInfo)
       })

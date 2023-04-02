@@ -32,6 +32,9 @@ cs 暴露了一个`abstract class Spider`, `constructor`接受一个`indexUrl`�
 
 打开某一章节内容页后, 需要获取下一页的链接, 实现者需要实现`getNextPageUrl`来返回下一页的链接
 
+**例外情况**:
+有些网站的漫画下一页不需要加载新页面, 只需要在当前页点击相关按钮就可以拉取下一张图片, 这种情况下 `getNextPageUrl` 可以返回 `undefined`, 就不加载下一页了
+
 获取到章节内容页的图片链接后, 依据链接, 实现者需要指定图像的保存位置, 需要实现`getImageSavePath`来从链接生成对应的图像文件下载保存路径
 
 ## 如何使用
