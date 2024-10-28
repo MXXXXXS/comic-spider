@@ -1,6 +1,6 @@
-import * as puppeteer from "puppeteer"
+import * as puppeteer from "puppeteer-core"
 import * as path from "path"
-import * as HttpProxyAgent from "http-proxy-agent"
+import { HttpProxyAgent } from "http-proxy-agent"
 import Events from "events"
 import fetch, { Headers } from "node-fetch"
 import { createWriteStream } from "fs"
@@ -15,7 +15,8 @@ enum ImageDownloadStates {
 }
 
 export interface SpiderArgs {
-  indexUrl: string
+  tocPageUrl: string
+  browserExecutablePath: string
   headers?: [string, string][]
   proxy?: string
   throttle?: number
@@ -32,7 +33,9 @@ export interface ImageInfo {
 }
 
 export abstract class Spider extends Events {
-  indexUrl = ""
+  tocPageUrl = ""
+  browserExecutablePath =
+    "C:/Program Files/Google/Chrome/Application/chrome.exe"
   headers: [string, string][] = [
     ["DNT", "1"],
     [
@@ -50,7 +53,8 @@ export abstract class Spider extends Events {
   private imageInfoMap: Record<string, ImageInfo> = {}
 
   constructor({
-    indexUrl,
+    tocPageUrl,
+    browserExecutablePath,
     headers = [],
     proxy = "",
     throttle = 1000,
@@ -60,14 +64,15 @@ export abstract class Spider extends Events {
     chapterRange,
   }: SpiderArgs) {
     super()
-    this.indexUrl = indexUrl
+    this.tocPageUrl = tocPageUrl
+    this.browserExecutablePath = browserExecutablePath
     this.proxy = proxy
     this.throttle = throttle
     this.throttleRandom = throttleRandom
     this.headless = headless
     this.pageParallelCounts = pageParallelCounts
     this.chapterRange = chapterRange || this.chapterRange
-    this.headers.push(["Referer", new URL(indexUrl).href], ...headers)
+    this.headers.push(["Referer", new URL(tocPageUrl).href], ...headers)
   }
 
   abstract getChapterEntries(indexPage: puppeteer.Page): Promise<string[]>
@@ -82,6 +87,7 @@ export abstract class Spider extends Events {
 
   private async openBrowser() {
     const browser = await puppeteer.launch({
+      executablePath: this.browserExecutablePath,
       headless: this.headless,
       defaultViewport: {
         width: 1280,
@@ -112,7 +118,7 @@ export abstract class Spider extends Events {
       this.imageInfoMap[imageInfo.url].state = ImageDownloadStates.downloading
       const res = await fetch(imageInfo.url, {
         headers: new Headers(this.headers),
-        agent: new HttpProxyAgent(this.proxy),
+        agent: this.proxy ? new HttpProxyAgent(this.proxy) : undefined,
       })
       const imageSavePath = this.getImageSavePath(imageInfo)
       ensureDirSync(path.dirname(imageSavePath))
@@ -147,32 +153,36 @@ export abstract class Spider extends Events {
       await wait(this.throttle + this.throttleRandom * Math.random())
       currentPageIndex++
     }
+    page.close()
   }
 
   async run() {
     this.browser = await this.openBrowser()
     const indexPage = await this.browser.newPage()
-    await indexPage.goto(this.indexUrl)
+    await indexPage.goto(this.tocPageUrl)
     const chapterEntries = (await this.getChapterEntries(indexPage)).slice(
-      ...this.chapterRange
+      this.chapterRange[0] - 1,
+      this.chapterRange[1]
     )
     this.on("imageInfoList", (imageInfoList: ImageInfo[]) => {
       imageInfoList.forEach((imageInfo) => {
         this.downloadImg(imageInfo)
       })
     })
-    for (
-      let index = 0;
-      index < chapterEntries.length;
-      index += this.pageParallelCounts
-    ) {
+    for (let index = 0; index < chapterEntries.length; ) {
       const entries = chapterEntries.slice(
         index,
-        index + this.pageParallelCounts
+        index + Math.min(this.pageParallelCounts, chapterEntries.length - index)
       )
       await Promise.all(
         entries.map((chapterEntry) => this.fetchChapter(chapterEntry))
       )
+
+      if (index + this.pageParallelCounts > chapterEntries.length - 1) {
+        index += 1
+      } else {
+        index += this.pageParallelCounts
+      }
     }
     process.exit(0)
   }
